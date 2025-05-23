@@ -255,8 +255,7 @@
         const userCount = document.getElementById('userCount');
         
         // Socket.io 연결
-        const socket = io('http://192.168.219.109:3000');
-        
+        const socket = io();
         // 이벤트 리스너
         colorPicker.addEventListener('change', (e) => {
             currentColor = e.target.value;
