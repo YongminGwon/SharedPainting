@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 화이트보드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .title {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tool-group label {
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        #colorPicker {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        #colorPicker:hover {
+            transform: scale(1.1);
+        }
+
+        #brushSize {
+            width: 100px;
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            cursor: pointer;
+        }
+
+        #brushSize::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn.danger {
+            background: rgba(255, 59, 48, 0.8);
+        }
+
+        .btn.danger:hover {
+            background: rgba(255, 59, 48, 1);
+        }
+
+        .status {
+            color: white;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status::before {
+            content: '👥';
+            font-size: 16px;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: white;
+            margin: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        #whiteboard {
+            display: block;
+            cursor: crosshair;
+            width: 100%;
+            height: 100%;
+        }
+
+        #whiteboard:active {
+            cursor: grabbing;
+        }
+
+        .brush-preview {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 0, 0, 0.3);
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .canvas-container:hover .brush-preview {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 10px;
+                padding: 10px;
+            }
+
+            .toolbar {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .tool-group {
+                padding: 6px 10px;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🎨 실시간 화이트보드</h1>
+            <div class="toolbar">
+                <div class="tool-group">
+                    <label for="colorPicker">색상:</label>
+                    <input type="color" id="colorPicker" value="#000000">
+                </div>
+                <div class="tool-group">
+                    <label for="brushSize">크기:</label>
+                    <input type="range" id="brushSize" min="1" max="50" value="5">
+                    <span id="sizeDisplay">5px</span>
+                </div>
+                <button class="btn" id="eraserBtn">지우개</button>
+                <button class="btn danger" id="clearBtn">전체 지우기</button>
+            </div>
+            <div class="status">
+                <span id="userCount">0</span>명 접속중
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="whiteboard"></canvas>
+            <div class="brush-preview" id="brushPreview"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // 캔버스 설정
+        const canvas = document.getElementById('whiteboard');
+        const ctx = canvas.getContext('2d');
+        const brushPreview = document.getElementById('brushPreview');
+        
+        // 캔버스 크기 설정
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // 그리기 상태
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentColor = '#000000';
+        let currentSize = 5;
+        let isEraser = false;
+        
+        // UI 요소들
+        const colorPicker = document.getElementById('colorPicker');
+        const brushSize = document.getElementById('brushSize');
+        const sizeDisplay = document.getElementById('sizeDisplay');
+        const eraserBtn = document.getElementById('eraserBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const userCount = document.getElementById('userCount');
+        
+        // Socket.io 연결
+        const socket = io('http://192.168.219.109:3000');
+        
+        // 이벤트 리스너
+        colorPicker.addEventListener('change', (e) => {
+            currentColor = e.target.value;
+            isEraser = false;
+            eraserBtn.textContent = '지우개';
+            eraserBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+        });
+        
+        brushSize.addEventListener('input', (e) => {
+            currentSize = e.target.value;
+            sizeDisplay.textContent = currentSize + 'px';
+            updateBrushPreview();
+        });
+        
+        eraserBtn.addEventListener('click', () => {
+            isEraser = !isEraser;
+            if (isEraser) {
+                eraserBtn.textContent = '브러시';
+                eraserBtn.style.background = 'rgba(255, 59, 48, 0.8)';
+            } else {
+                eraserBtn.textContent = '지우개';
+                eraserBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+            }
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            if (confirm('정말로 모든 그림을 지우시겠습니까?')) {
+                socket.emit('clearCanvas');
+            }
+        });
+        
+        // 브러시 미리보기 업데이트
+        function updateBrushPreview() {
+            brushPreview.style.width = currentSize + 'px';
+            brushPreview.style.height = currentSize + 'px';
+            brushPreview.style.backgroundColor = isEraser ? 'rgba(255, 255, 255, 0.8)' : currentColor;
+        }
+        
+        // 마우스 이벤트
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        
+        // 터치 이벤트 (모바일 지원)
+        canvas.addEventListener('touchstart', handleTouch);
+        canvas.addEventListener('touchmove', handleTouch);
+        canvas.addEventListener('touchend', stopDrawing);
+        
+        // 마우스 커서 추적
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            brushPreview.style.left = (rect.left + x) + 'px';
+            brushPreview.style.top = (rect.top + y) + 'px';
+        });
+        
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            lastX = e.clientX - rect.left;
+            lastY = e.clientY - rect.top;
+        }
+        
+        function draw(e) {
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            const drawData = {
+                x0: lastX,
+                y0: lastY,
+                x1: currentX,
+                y1: currentY,
+                color: isEraser ? '#FFFFFF' : currentColor,
+                size: currentSize,
+                isEraser: isEraser
+            };
+            
+            drawLine(drawData);
+            socket.emit('drawing', drawData);
+            
+            lastX = currentX;
+            lastY = currentY;
+        }
+        
+        function stopDrawing() {
+            isDrawing = false;
+        }
+        
+        function handleTouch(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' :
+                                            e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        }
+        
+        function drawLine(data) {
+            ctx.beginPath();
+            ctx.moveTo(data.x0, data.y0);
+            ctx.lineTo(data.x1, data.y1);
+            ctx.strokeStyle = data.color;
+            ctx.lineWidth = data.size;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            if (data.isEraser) {
+                ctx.globalCompositeOperation = 'destination-out';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            ctx.stroke();
+            ctx.globalCompositeOperation = 'source-over';
+        }
+        
+        // Socket 이벤트
+        socket.on('drawing', drawLine);
+        
+        socket.on('clearCanvas', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+        
+        socket.on('userCount', (count) => {
+            userCount.textContent = count;
+        });
+        
+        socket.on('loadDrawing', (data) => {
+            data.forEach(drawLine);
+        });
+        
+        // 초기 브러시 미리보기 설정
+        updateBrushPreview();
+    </script>
+</body>
+</html>
