@@ -255,7 +255,12 @@
         const userCount = document.getElementById('userCount');
         
         // Socket.io 연결
-        const socket = io();
+        const socket = io(
+            location.hostname === 'sharedpainter.ddns.net'
+                ? 'http://sharedpainter.ddns.net:3000'
+                : 'http://192.168.219.109:3000',
+            { transports: ['websocket', 'polling'] }
+        );
         // 이벤트 리스너
         colorPicker.addEventListener('change', (e) => {
             currentColor = e.target.value;

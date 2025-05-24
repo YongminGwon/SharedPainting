@@ -83,7 +83,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
-  console.log(`http://localhost:${PORT} 에서 확인하세요.`);
+  console.log(`http://0.0.0.0:${PORT} 에서 확인하세요.`);
 });
